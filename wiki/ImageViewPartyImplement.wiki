@@ -8,8 +8,8 @@
 
 * Activity间数据传递
 
-* TouchEvent处理
-* 模拟Timer事件
-* 手势类的应用
+* TouchEvent 处理
+**模拟Timer事件
+**手势类的应用
 
  
