@@ -1,0 +1,95 @@
+Antico is a Qt4/X11 Desktop/Window Manager.
+The goal is to create a Window/Desktop manager simple and fast. All parameters must be configured from few files, avoiding unnecessary complications, following the K.I.S.S. philosophy.
+The whole project is be based only on Qt4 libraries, without any other external dependencies (e.g. kdelibs ...). 
+
+***********
+FEATURES
+***********
+
+The whole application is based on "antico.cfg" file.
+Only two frame button: top right button to close, top left button to iconize (left mouse button) and maximize (right mouse button).
+Menu applications can be added and removed from "Manager" panel.
+Frame border dimension, color, pixmap, desk wallpaper managed from "Manager" panel.
+The style is selected from Manager and save in a xxx.stl file: if you want to share your personal style, save the directory and send it ...
+General style (Oxygen, Plastique ..), fonts family and size, window background etc. can be selected from "qtconfig".
+Add links to filesystem directory/file/application with right mouse button (double click to open the link and right mouse button to delete it).
+Dockicon added to Dockbar deleted with right mouse button or added to System Tray.
+Category apps menu on Launcher/Dockbar.
+See "git commits" on repository ...
+
+***********
+REPOSITORY
+***********
+http://github.com/antico/antico/tree/master
+
+***********
+DOWNLOAD
+***********
+- on first installation: "git clone git://github.com/antico/antico.git"
+- to update your local repository: "git pull"
+
+*************
+INSTALLATION
+*************
+To compile, enter in "Antico" dir (where is the antico.pro) and type on shell:
+"qmake" (or qmake-qt4)
+"make"
+---------------------------------------------------
+To install, type on shell (as root):
+"sh install"
+---------------------------------------------------
+To run the window manager:
+- from KDM/GMD, select "Antico" from WM list
+- from shell, type "xinit /path/to/antico/bin" (first "pkill" kdm/gdm and X)
+---------------------------------------------------
+To uninstall, type on shell (as root):
+"sh uninstall"
+---------------------------------------------------
+To init the WM, just delete the "antico.cfg".
+
+************
+DEVELOPMENT
+************
+To test the window manager, type on shell:
+
+DISPLAY=:0
+Xephyr :1 -ac -screen 1024x768 & DISPLAY=:1; $HOME/antico/antico
+
+(where 1024x768 is your preferred screen size and $HOME if you have download Antico in user home)
+---------------------------------------------------
+To hide debug messages, uncomment in antico.pro
+//DEFINES = QT_NO_DEBUG_OUTPUT
+---------------------------------------------------
+***********
+LANGUAGE
+***********
+Add your language in "antico.pro";
+Type on shell "lupdate antico.pro";
+Run "linguistic" and make your language translation;
+Type on shell "lrelease antico.pro".
+Your language.qm (e.g. it_IT.qm) should be in /language dir.
+Check debug msg. at startup for control.
+
+***********
+STYLE
+***********
+Use "qtconfig" to select your preferred style (Oxygen, Plastique), fonts, effects, etc.
+
+***********
+ENVIRONMENT PATHS
+***********
+Cause there isn't a respected standard in distro world :-(, the .desktop file is searched in /usr/share and the Trash in $HOME/.local/share
+
+***********
+THANKS
+***********
+- Alexander Linden for QLWM (http://qlwm.get.to) from where I was inspired... and for his help;
+- Ian Reinhart Geiser for his helpful patch;
+- Franz Fellner for his code debug;
+- Ayoy for Polish translation;
+- Disels for Russian translation;
+- Jiri Popek for Czech translation;
+- Thomas Rauch for German translation;
+- Elega for Spanish translation;
+- Me for Italian translation :-)
+
