@@ -1,0 +1,331 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 02_raw_keyboard_suppport.dpatch by Alt Linux.
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Add support for raw keyboard.
+
+@DPATCH@
+diff -urN rdesktop.orig/rdesktop.c rdesktop/rdesktop.c
+--- rdesktop.orig/rdesktop.c	2007-02-10 07:48:50 +0200
++++ rdesktop/rdesktop.c	2007-04-21 19:27:14 +0300
+@@ -91,6 +91,7 @@
+ RD_BOOL g_owncolmap = False;
+ RD_BOOL g_ownbackstore = True;	/* We can't rely on external BackingStore */
+ RD_BOOL g_seamless_rdp = False;
++RD_BOOL g_raw_keyboard = False;
+ uint32 g_embed_wnd;
+ uint32 g_rdp5_performanceflags =
+ 	RDP5_NO_WALLPAPER | RDP5_NO_FULLWINDOWDRAG | RDP5_NO_MENUANIMATIONS;
+@@ -211,6 +212,7 @@
+ 	fprintf(stderr, "   -0: attach to console\n");
+ 	fprintf(stderr, "   -4: use RDP version 4\n");
+ 	fprintf(stderr, "   -5: use RDP version 5 (default)\n");
++	fprintf(stderr, "   -y: use raw keyboard (default no)\n");
+ }
+ 
+ static void
+@@ -450,7 +452,7 @@
+ #endif
+ 
+ 	while ((c = getopt(argc, argv,
+-			   VNCOPT "Au:L:d:s:c:p:n:k:g:fbBeEmzCDKS:T:NX:a:x:Pr:045h?")) != -1)
++			   VNCOPT "Au:L:d:s:c:p:n:k:g:fbBeEmzCDKS:T:NX:a:x:Pr:045yh?")) != -1)
+ 	{
+ 		switch (c)
+ 		{
+@@ -782,6 +784,9 @@
+ 			case '5':
+ 				g_use_rdp5 = True;
+ 				break;
++			case 'y':
++				g_raw_keyboard = True;
++				break;
+ 
+ 			case 'h':
+ 			case '?':
+diff -urN rdesktop.orig/scancodes.h rdesktop/scancodes.h
+--- rdesktop.orig/scancodes.h	2003-10-28 05:20:43 +0200
++++ rdesktop/scancodes.h	2007-04-21 19:27:30 +0300
+@@ -152,7 +152,7 @@
+ #define SCANCODE_KEY_43 0x1c
+ #define SCANCODE_CHAR_ENTER SCANCODE_KEY_43
+ 
+-#define SCANCODE_KEY_44 0x2a
++#define SCANCODE_KEY_44 (SCANCODE_EXTENDED | 0x2a)
+ #define SCANCODE_CHAR_LSHIFT SCANCODE_KEY_44
+ 
+ /* Only on international keyboard */
+@@ -191,7 +191,7 @@
+ /* Only on Brazilian and some Far East keyboards */
+ #define SCANCODE_KEY_56 0x73
+ 
+-#define SCANCODE_KEY_57 0x36
++#define SCANCODE_KEY_57 (SCANCODE_EXTENDED | 0x36)
+ #define SCANCODE_CHAR_RSHIFT SCANCODE_KEY_57
+ 
+ #define SCANCODE_KEY_58 0x1d
+@@ -352,10 +352,15 @@
+ 
+ /* Key 124: The Print Screen sequence is complicated, and
+    hardcoded in xkeymap.c */
++#define SCANCODE_KEY_124 0xff
++#define SCANCODE_CHAR_PRINT SCANCODE_KEY_124
+ 
+ #define SCANCODE_KEY_125 0x46
+ #define SCANCODE_CHAR_SCROLLLOCK SCANCODE_KEY_125
+ 
++#define SCANCODE_KEY_126 (SCANCODE_EXTENDED | 0x59)
++#define SCANCODE_CHAR_PAUSE SCANCODE_KEY_126
++
+ /* Key 126: The Pause and Break sequences is complicated, and
+    hardcoded in xkeymap.c */
+ 
+diff -urN rdesktop.orig/xkeymap.c rdesktop/xkeymap.c
+--- rdesktop.orig/xkeymap.c	2007-03-20 17:32:43 +0200
++++ rdesktop/xkeymap.c	2007-04-21 19:47:15 +0300
+@@ -55,6 +55,7 @@
+ static int min_keycode;
+ static uint16 remote_modifier_state = 0;
+ static uint16 saved_remote_modifier_state = 0;
++static uint32 vkmenu, vkcontrol, vklshift, vkrshift, vknumlock;
+ 
+ static void update_modifier_state(uint8 scancode, RD_BOOL pressed);
+ 
+@@ -949,6 +950,7 @@
+ 		rdp_send_scancode(ev_time, RDP_KEYRELEASE, SCANCODE_CHAR_RALT);
+ 
+ 	reset_winkey(ev_time);
++        vknumlock = get_key_state(state, XK_Num_Lock);
+ 
+ 	if (g_numlock_sync)
+ 		rdp_send_input(ev_time, RDP_INPUT_SYNCHRONIZE, 0, ui_get_numlock_state(state), 0);
+@@ -1034,3 +1036,153 @@
+ 		rdp_send_input(time, RDP_INPUT_SCANCODE, flags, scancode, 0);
+ 	}
+ }
++
++typedef unsigned char byte;
++typedef unsigned int  dword;
++
++static byte vkscancode[ 128] = {
++        /* 00 - 07 */ 0, 0, 0, 0, 0, 0, 0, 0,
++        /* 08 - 0f */ 0, SCANCODE_CHAR_ESC, SCANCODE_CHAR_1, SCANCODE_CHAR_2, SCANCODE_CHAR_3, SCANCODE_CHAR_4, SCANCODE_CHAR_5, SCANCODE_CHAR_6,
++        /* 10 - 17 */ SCANCODE_CHAR_7, SCANCODE_CHAR_8, SCANCODE_CHAR_9, SCANCODE_CHAR_0, SCANCODE_CHAR_MINUS, SCANCODE_CHAR_EQUAL, SCANCODE_CHAR_BACKSPACE, SCANCODE_CHAR_TAB,
++        /* 18 - 1f */ SCANCODE_CHAR_Q, SCANCODE_CHAR_W, SCANCODE_CHAR_E, SCANCODE_CHAR_R, SCANCODE_CHAR_T, SCANCODE_CHAR_Y, SCANCODE_CHAR_U, SCANCODE_CHAR_I,
++        /* 20 - 27 */ SCANCODE_CHAR_O, SCANCODE_CHAR_P, SCANCODE_CHAR_BRACKETLEFT, SCANCODE_CHAR_BRACKETRIGHT, SCANCODE_CHAR_ENTER, SCANCODE_CHAR_LCTRL, SCANCODE_CHAR_A, SCANCODE_CHAR_S,
++        /* 28 - 2f */ SCANCODE_CHAR_D, SCANCODE_CHAR_F, SCANCODE_CHAR_G, SCANCODE_CHAR_H, SCANCODE_CHAR_J, SCANCODE_CHAR_K, SCANCODE_CHAR_L, SCANCODE_CHAR_SEMICOLON,
++        /* 30 - 37 */ SCANCODE_CHAR_APOSTROPHE, SCANCODE_CHAR_GRAVE, SCANCODE_CHAR_LSHIFT, SCANCODE_KEY_42, SCANCODE_CHAR_Z, SCANCODE_CHAR_X, SCANCODE_CHAR_C, SCANCODE_CHAR_V,
++        /* 38 - 3f */ SCANCODE_CHAR_B, SCANCODE_CHAR_N, SCANCODE_CHAR_M, SCANCODE_CHAR_COMMA, SCANCODE_CHAR_DOT, SCANCODE_CHAR_SLASH, SCANCODE_CHAR_RSHIFT, SCANCODE_CHAR_NUMERICSTAR,
++        /* 40 - 47 */ SCANCODE_CHAR_LALT, SCANCODE_CHAR_SPACE, SCANCODE_CHAR_CAPSLOCK, SCANCODE_CHAR_F1, SCANCODE_CHAR_F2, SCANCODE_CHAR_F3, SCANCODE_CHAR_F4, SCANCODE_CHAR_F5,
++        /* 48 - 4f */ SCANCODE_CHAR_F6, SCANCODE_CHAR_F7, SCANCODE_CHAR_F8, SCANCODE_CHAR_F9, SCANCODE_CHAR_F10, SCANCODE_CHAR_NUMLOCK, SCANCODE_CHAR_SCROLLLOCK, SCANCODE_CHAR_NUMERIC7,
++        /* 50 - 57 */ SCANCODE_CHAR_NUMERIC8, SCANCODE_CHAR_NUMERIC9, SCANCODE_CHAR_NUMERICMINUS, SCANCODE_CHAR_NUMERIC4, SCANCODE_CHAR_NUMERIC5, SCANCODE_CHAR_NUMERIC6, SCANCODE_CHAR_NUMERICPLUS, SCANCODE_CHAR_NUMERIC1,
++        /* 58 - 5f */ SCANCODE_CHAR_NUMERIC2, SCANCODE_CHAR_NUMERIC3, SCANCODE_CHAR_NUMERIC0, SCANCODE_CHAR_NUMERICDOT, 0, 0, 0, SCANCODE_CHAR_F11,
++        /* 60 - 67 */ SCANCODE_CHAR_F12, SCANCODE_CHAR_HOME, SCANCODE_CHAR_UPARROW, SCANCODE_CHAR_PAGEUP, SCANCODE_CHAR_LARROW, 0, SCANCODE_CHAR_RARROW, SCANCODE_CHAR_END,
++        /* 68 - 6f */ SCANCODE_CHAR_DNARROW, SCANCODE_CHAR_PAGEDOWN, SCANCODE_CHAR_INSERT, SCANCODE_CHAR_DELETE, SCANCODE_CHAR_NUMERICENTER, SCANCODE_CHAR_RCTRL, SCANCODE_CHAR_PAUSE, SCANCODE_CHAR_PRINT,
++        /* 70 - 77 */ SCANCODE_CHAR_NUMERICSLASH, SCANCODE_CHAR_RALT, 0, SCANCODE_CHAR_LWIN, SCANCODE_CHAR_RWIN, SCANCODE_CHAR_APPLICATION, 0, 0,
++        /* 78 - 7f */ 0, 0, 0, 0, 0, 0, 0, 0
++};
++
++
++static inline int vk_handle_special_keys( uint32 keysym, uint32 ev_time, RD_BOOL pressed) {
++
++        RD_BOOL leftkey = 0;
++
++        switch( keysym)        {
++        case SCANCODE_CHAR_NUMLOCK:
++                if( !pressed)
++                        vknumlock = !vknumlock;
++                return 0;
++
++        case SCANCODE_CHAR_ENTER:
++        case SCANCODE_CHAR_NUMERICENTER:
++                if( pressed && vkmenu && vkcontrol) {
++                        /* Ctrl-Alt-Enter: toggle full screen */
++                       xwin_toggle_fullscreen();
++                       return 1;
++                }
++               return 0;
++
++        case SCANCODE_CHAR_PAUSE:
++                if( pressed) {
++                        if( vkcontrol) {
++                                rdp_send_scancode( ev_time, RDP_KEYPRESS, (SCANCODE_EXTENDED | 0x46));
++                                rdp_send_scancode( ev_time, RDP_KEYPRESS, (SCANCODE_EXTENDED | 0xc6));
++                        }
++                        else {
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, 0xe1, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, 0x1d, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, 0x45, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, 0xe1, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, 0x9d, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, 0xc5, 0);
++                        }
++               }
++                else {
++                       /* Release Left Ctrl */
++                        if( vkcontrol)
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYRELEASE, 0x1d, 0);
++                }
++                return 1;
++
++        case SCANCODE_CHAR_PRINT:
++                if( vkmenu)
++                        rdp_send_input( ev_time, RDP_INPUT_SCANCODE, pressed ? RDP_KEYPRESS : RDP_KEYRELEASE, 0x54, 0);
++                else if( vkcontrol && (vklshift || vklshift))
++                        rdp_send_input( ev_time, RDP_INPUT_SCANCODE, pressed ? RDP_KEYPRESS : RDP_KEYRELEASE, SCANCODE_EXTENDED|0x37, 0);
++                else {
++#if 0
++                        if( pressed) {
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, SCANCODE_CHAR_LSHIFT, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYPRESS, SCANCODE_EXTENDED|0x37, 0);
++                        }
++                        else {
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYRELEASE, SCANCODE_EXTENDED|0x37, 0);
++                                rdp_send_input( ev_time, RDP_INPUT_SCANCODE, RDP_KEYRELEASE, SCANCODE_CHAR_LSHIFT, 0);
++                        }
++#endif
++                }
++                return 1;
++
++        case SCANCODE_CHAR_LWIN:
++                leftkey = True;
++        case SCANCODE_CHAR_RWIN:
++                if( pressed) {
++                        if( g_use_rdp5) {
++                                rdp_send_scancode(ev_time, RDP_KEYPRESS, keysym);
++                        }
++                        else {
++                                /* RDP4 doesn't support winkey. Fake with Ctrl-Esc */
++                                rdp_send_scancode( ev_time, RDP_KEYPRESS, SCANCODE_CHAR_LCTRL);
++                                rdp_send_scancode( ev_time, RDP_KEYPRESS, SCANCODE_CHAR_ESC);
++                        }
++                }
++                else {
++                        if( g_use_rdp5) {
++                                rdp_send_scancode(ev_time, RDP_KEYRELEASE, keysym);
++                        }
++                        else {
++                                rdp_send_scancode(ev_time, RDP_KEYRELEASE, SCANCODE_CHAR_ESC);
++                                rdp_send_scancode(ev_time, RDP_KEYRELEASE, SCANCODE_CHAR_LCTRL);
++                        }
++                }
++                return 1;
++
++        case SCANCODE_CHAR_INSERT:
++        case SCANCODE_CHAR_DELETE:
++        case SCANCODE_CHAR_LARROW:
++        case SCANCODE_CHAR_HOME:
++        case SCANCODE_CHAR_END:
++        case SCANCODE_CHAR_UPARROW:
++        case SCANCODE_CHAR_DNARROW:
++        case SCANCODE_CHAR_PAGEUP:
++        case SCANCODE_CHAR_PAGEDOWN:
++        case SCANCODE_CHAR_RARROW:
++               rdp_send_scancode( ev_time, pressed ? RDP_KEYPRESS : RDP_KEYRELEASE, SCANCODE_CHAR_LSHIFT);
++               rdp_send_scancode( ev_time, pressed ? RDP_KEYPRESS : RDP_KEYRELEASE, keysym);
++               return 1;
++        }
++       return 0;
++}
++
++void vk_handle_key( XKeyEvent *xkey) {
++
++        uint32 vk, ev_time, pressed = (xkey->type == KeyPress);
++
++        vk = vkscancode[ xkey->keycode];
++        DEBUG_KBD(( "vk_handle_key( scancode=0x%x) vk = 0x%x\n", xkey->keycode, vk));
++
++        if( !vk)
++                return;
++
++        ev_time = time( 0);
++
++        if( (vk == SCANCODE_CHAR_LCTRL) || (vk == SCANCODE_CHAR_RCTRL))
++                vkcontrol = pressed;
++        else if( (vk == SCANCODE_CHAR_LALT) || (vk == SCANCODE_CHAR_RALT))
++                vkmenu = pressed;
++        else if( vk == SCANCODE_CHAR_LSHIFT)
++                vklshift = pressed;
++        else if( vk == SCANCODE_CHAR_RSHIFT)
++                vkrshift = pressed;
++        else if( vk_handle_special_keys( vk, ev_time, pressed))
++                return;
++
++        rdp_send_input( ev_time, RDP_INPUT_SCANCODE, pressed ? RDP_KEYPRESS : RDP_KEYRELEASE, vk, 0);
++}
+Файлы rdesktop.orig/xkeymap.o и rdesktop/xkeymap.o различаются
+diff -urN rdesktop.orig/xwin.c rdesktop/xwin.c
+--- rdesktop.orig/xwin.c	2007-04-12 19:04:25 +0300
++++ rdesktop/xwin.c	2007-04-21 19:39:42 +0300
+@@ -28,6 +28,8 @@
+ #include <strings.h>
+ #include "rdesktop.h"
+ #include "xproto.h"
++#include "X11/XKBlib.h"
++#include "X11/keysym.h"
+ 
+ extern int g_width;
+ extern int g_height;
+@@ -43,6 +45,7 @@
+    As of RDP 5.1, it may be 8, 15, 16 or 24. */
+ extern int g_server_depth;
+ extern int g_win_button_size;
++extern RD_BOOL g_raw_keyboard;
+ 
+ Display *g_display;
+ Time g_last_gesturetime;
+@@ -127,6 +130,8 @@
+     so its endianess doesn't matter)
+  */
+ static RD_BOOL g_no_translate_image = False;
++static RD_BOOL g_modeswitch_down = False;
++
+ 
+ /* endianness */
+ static RD_BOOL g_host_be;
+@@ -1953,6 +1958,8 @@
+ 	}
+ }
+ 
++extern void vk_handle_key( XKeyEvent *xkey);
++
+ 
+ /* Process events in Xlib queue
+    Returns 0 after user quit, 1 otherwise */
+@@ -1977,6 +1984,12 @@
+ 			continue;
+ 		}
+ 
++		if( g_raw_keyboard && ((xevent.type == KeyPress) || (xevent.type == KeyRelease))) {
++			g_last_gesturetime = xevent.xkey.time;
++			vk_handle_key( (XKeyEvent*)&xevent);
++			continue;
++		}
++
+ 		switch (xevent.type)
+ 		{
+ 			case VisibilityNotify:
+@@ -2016,6 +2029,11 @@
+ 						      str, sizeof(str), &keysym, NULL);
+ 				}
+ 
++
++				// Mode_switch during XGrabKeyboard fix: Ungrab Keyboard during Mode_switch
++				if ( keysym == XK_Mode_switch ) g_modeswitch_down = True;
++				if ( g_focused && g_modeswitch_down ) XUngrabKeyboard(g_display, CurrentTime);
++
+ 				DEBUG_KBD(("KeyPress for keysym (0x%lx, %s)\n", keysym,
+ 					   get_ksname(keysym)));
+ 
+@@ -2032,6 +2050,11 @@
+ 				XLookupString((XKeyEvent *) & xevent, str,
+ 					      sizeof(str), &keysym, NULL);
+ 
++
++				// Mode_switch during XGrabKeyboard fix: Regrab Keyboard after Mode_switch
++				if ( keysym == XK_Mode_switch ) g_modeswitch_down = False;
++				if ( g_focused && !g_modeswitch_down ) XGrabKeyboard(g_display, g_wnd, True, GrabModeAsync, GrabModeAsync, CurrentTime);
++
+ 				DEBUG_KBD(("\nKeyRelease for keysym (0x%lx, %s)\n", keysym,
+ 					   get_ksname(keysym)));
+ 
