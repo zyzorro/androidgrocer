@@ -1,0 +1,376 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 01_paging.dpatch by Adilson Oliveira <adilson@ubuntu.com>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Add viewport mode, suitable for small screens.
+
+@DPATCH@
+diff -Nur -x '*.orig' -x '*~' rdesktop-1.5.0.ume/proto.h rdesktop-1.5.0.ume.new/proto.h
+--- rdesktop-1.5.0.ume/proto.h	2008-03-28 17:31:19.000000000 -0300
++++ rdesktop-1.5.0.ume.new/proto.h	2008-03-28 17:31:24.000000000 -0300
+@@ -235,7 +235,7 @@
+ RD_BOOL get_key_state(unsigned int state, uint32 keysym);
+ RD_BOOL ui_init(void);
+ void ui_deinit(void);
+-RD_BOOL ui_create_window(void);
++RD_BOOL ui_create_window(RD_BOOL ToggleFullscreen);
+ void ui_resize_window(void);
+ void ui_destroy_window(void);
+ void xwin_toggle_fullscreen(void);
+diff -Nur -x '*.orig' -x '*~' rdesktop-1.5.0.ume/rdesktop.c rdesktop-1.5.0.ume.new/rdesktop.c
+--- rdesktop-1.5.0.ume/rdesktop.c	2008-03-28 17:31:19.000000000 -0300
++++ rdesktop-1.5.0.ume.new/rdesktop.c	2008-03-28 17:31:42.000000000 -0300
+@@ -103,6 +103,13 @@
+ char g_redirect_cookie[128];
+ uint32 g_redirect_flags = 0;
+ 
++/* For viewport mode */
++int xo = 0;
++int yo = 0;
++int perm_xo = 0; // Safe to keep in 0 for now
++int perm_yo = 0;
++RD_BOOL viewport_mode = False;
++
+ #ifdef WITH_RDPSND
+ RD_BOOL g_rdpsnd = False;
+ #endif
+@@ -122,6 +129,7 @@
+ rdp2vnc_connect(char *server, uint32 flags, char *domain, char *password,
+ 		char *shell, char *directory);
+ #endif
++
+ /* Display usage information */
+ static void
+ usage(char *program)
+@@ -563,6 +571,8 @@
+ 					g_pos |= (*p == '-') ? 4 : 1;
+ 					g_ypos = strtol(p, NULL, 10);
+ 				}
++				perm_xo = xo;
++	    		perm_yo = yo;
+ 
+ 				break;
+ 
+@@ -947,7 +957,7 @@
+ 		memset(password, 0, sizeof(password));
+ 
+ 		if (run_count == 0)
+-			if (!ui_create_window())
++			if (!ui_create_window(False))
+ 				continue_connect = False;
+ 
+ 		if (continue_connect)
+diff -Nur -x '*.orig' -x '*~' rdesktop-1.5.0.ume/xwin.c rdesktop-1.5.0.ume.new/xwin.c
+--- rdesktop-1.5.0.ume/xwin.c	2008-03-28 17:31:19.000000000 -0300
++++ rdesktop-1.5.0.ume.new/xwin.c	2008-03-28 17:31:24.000000000 -0300
+@@ -50,7 +50,11 @@
+ static int g_x_socket;
+ static Screen *g_screen;
+ Window g_wnd;
+-
++extern BOOL viewport_mode;
++BOOL viewport_keys_enabled = False;
++BOOL viewport_mode_locked = False;
++Window g_viewport_wnd = 0;
++uint32 g_embed_wnd;
+ /* SeamlessRDP support */
+ typedef struct _seamless_group
+ {
+@@ -134,6 +138,27 @@
+    ('host' is the machine running rdesktop; the host simply memcpy's
+     so its endianess doesn't matter)
+  */
++static Cursor viewportCursor;
++static int viewportLastX;
++static int viewportLastY;
++int g_viewport_width;
++int g_viewport_height;
++int g_saved_viewport_width = 0;
++int g_saved_viewport_height= 0;
++int g_saved_viewport_x= 0;
++int g_saved_viewport_y= 0;
++int g_saved_wnd_x = 0;
++int g_saved_wnd_y = 0;
++int g_wnd_x;
++int g_wnd_y;
++int viewport_x1;
++int viewport_y1;
++int xo;
++int yo;
++extern int perm_xo;
++extern int perm_yo;
++
++void MoveViewport(int hShift, int vShift);
+ static RD_BOOL g_no_translate_image = False;
+ 
+ /* endianness */
+@@ -524,7 +549,7 @@
+ 		return;
+ 	}
+ 
+-	XChangeProperty(g_display, wnd, hintsatom, hintsatom, 32, PropModeReplace,
++	XChangeProperty(g_display, g_viewport_wnd ? g_viewport_wnd : g_wnd, hintsatom, hintsatom, 32, PropModeReplace,
+ 			(unsigned char *) &motif_hints, PROP_MOTIF_WM_HINTS_ELEMENTS);
+ 
+ }
+@@ -1722,7 +1747,7 @@
+ }
+ 
+ RD_BOOL
+-ui_create_window(void)
++ui_create_window(RD_BOOL ToggleFullscreen)
+ {
+ 	uint8 null_pointer_mask[1] = { 0x80 };
+ 	uint8 null_pointer_data[24] = { 0x00 };
+@@ -1733,6 +1758,7 @@
+ 	int wndwidth, wndheight;
+ 	long input_mask, ic_input_mask;
+ 	XEvent xevent;
++	int x1, y1;
+ 
+ 	wndwidth = g_fullscreen ? WidthOfScreen(g_screen) : g_width;
+ 	wndheight = g_fullscreen ? HeightOfScreen(g_screen) : g_height;
+@@ -1767,7 +1793,75 @@
+ 		XSetForeground(g_display, g_gc, BlackPixelOfScreen(g_screen));
+ 		XFillRectangle(g_display, g_backstore, g_gc, 0, 0, g_width, g_height);
+ 	}
+-
++	if ((((g_width >= WidthOfScreen(g_screen)*1.05)) || 
++	    (g_height >= (HeightOfScreen(g_screen)*1.1))) && (ToggleFullscreen))
++	{
++	    viewport_mode_locked = True;
++	    viewport_keys_enabled = True;
++	}
++	
++        if ((!g_embed_wnd) && (viewport_mode))
++	{
++	    if (g_fullscreen)
++	    {
++        	x1 = (WidthOfScreen(g_screen) - g_width)/2;
++        	y1 = (HeightOfScreen(g_screen) - g_height)/2;
++        	g_viewport_width = (WidthOfScreen(g_screen));
++        	g_viewport_height= (HeightOfScreen(g_screen));
++	    }
++            else
++	    {
++		if (!ToggleFullscreen)
++		{
++		    xo = g_saved_viewport_x;
++        	    yo = g_saved_viewport_y;
++		}
++		if (g_saved_wnd_x == 0 && g_saved_wnd_y == 0)
++        	{
++        	    x1 = y1 = 0;
++        	}
++        	else
++        	{
++            	    x1 = g_saved_wnd_x;
++        	    y1 = g_saved_wnd_y;
++        	}
++
++        	if (g_saved_viewport_width && g_saved_viewport_height)
++        	{
++            	    g_viewport_width = g_saved_viewport_width;
++            	    g_viewport_height = g_saved_viewport_height;
++        	}
++        	else
++        	{
++    		    g_viewport_width = wndwidth < (WidthOfScreen(g_screen)*1.05) ? wndwidth : WidthOfScreen(g_screen)*3/4;
++    		    g_viewport_height= wndheight< (HeightOfScreen(g_screen)*1.1) ? wndheight: HeightOfScreen(g_screen)*3/4;
++		    g_viewport_width = g_viewport_width  & ~3;
++		}
++    	    }
++	    
++	    attribs.override_redirect = g_fullscreen;
++	    
++	    if (viewport_mode)
++	    {
++		if ((xo == 0) && (yo == 0))
++		{
++		    xo = (WidthOfScreen(g_screen) - g_viewport_width)/2;
++        	    yo = (HeightOfScreen(g_screen) - g_viewport_height)/2;
++		}
++		g_viewport_wnd = XCreateWindow (g_display, RootWindowOfScreen(g_screen), xo, yo, g_viewport_width, g_viewport_height, 
++						0, g_depth, InputOutput, g_visual, CWBackPixel | CWBackingStore | CWOverrideRedirect | CWColormap | CWBorderPixel, &attribs);
++						
++    		XSelectInput(g_display, g_viewport_wnd, ButtonPressMask | KeyPressMask |
++                		StructureNotifyMask | (g_fullscreen ? EnterWindowMask : 0) |
++                    		    (g_grab_keyboard ? (EnterWindowMask | LeaveWindowMask) : 0));
++				    
++		XReparentWindow (g_display, g_wnd, g_viewport_wnd, (ToggleFullscreen && g_fullscreen) ? perm_xo : 0, (ToggleFullscreen && g_fullscreen) ? perm_yo : 0);
++	    }
++	}
++
++	/* Check XStoreName consistency */
++		
++	XStoreName(g_display, g_viewport_wnd ? g_viewport_wnd : g_wnd, g_title);
+ 	XStoreName(g_display, g_wnd, g_title);
+ 	ewmh_set_wm_name(g_wnd, g_title);
+ 
+@@ -1778,7 +1872,7 @@
+ 	if (classhints != NULL)
+ 	{
+ 		classhints->res_name = classhints->res_class = "rdesktop";
+-		XSetClassHint(g_display, g_wnd, classhints);
++		XSetClassHint(g_display, g_viewport_wnd ? g_viewport_wnd : g_wnd, classhints);
+ 		XFree(classhints);
+ 	}
+ 
+@@ -1790,7 +1884,7 @@
+ 			sizehints->flags |= PPosition;
+ 		sizehints->min_width = sizehints->max_width = g_width;
+ 		sizehints->min_height = sizehints->max_height = g_height;
+-		XSetWMNormalHints(g_display, g_wnd, sizehints);
++		XSetWMNormalHints(g_display, g_viewport_wnd ? g_viewport_wnd : g_wnd, sizehints);
+ 		XFree(sizehints);
+ 	}
+ 
+@@ -1812,9 +1906,15 @@
+ 	}
+ 
+ 	XSelectInput(g_display, g_wnd, input_mask);
+-	XMapWindow(g_display, g_wnd);
++	if (viewport_mode)
++	{
++    	    XMapWindow (g_display, g_viewport_wnd);
++    	}
++	
++	XMapWindow(g_display, g_wnd); 
++	
++	/* wait for VisibilityNotify */ 
+ 
+-	/* wait for VisibilityNotify */
+ 	do
+ 	{
+ 		XMaskEvent(g_display, VisibilityChangeMask, &xevent);
+@@ -1876,7 +1976,14 @@
+ 	if (g_IC != NULL)
+ 		XDestroyIC(g_IC);
+ 
+-	XDestroyWindow(g_display, g_wnd);
++        if (g_viewport_wnd)
++        {
++	    XDestroyWindow (g_display, g_viewport_wnd);
++        }
++        else
++        {
++	    XDestroyWindow(g_display, g_wnd);
++        }
+ }
+ 
+ void
+@@ -1897,7 +2004,7 @@
+ 
+ 	ui_destroy_window();
+ 	g_fullscreen = !g_fullscreen;
+-	ui_create_window();
++	ui_create_window(True);
+ 
+ 	XDefineCursor(g_display, g_wnd, g_current_cursor);
+ 
+@@ -2101,6 +2208,21 @@
+ 						    xevent.xmotion.y_root - g_move_y_offset);
+ 					break;
+ 				}
++				
++                             if (viewportCursor)
++                                {
++                                  /*
++                                   * Pointer is in viewport navigation mode.
++                                   */
++				   
++                                  MoveViewport(viewportLastX - xevent.xmotion.x_root,
++                                                            viewportLastY - xevent.xmotion.y_root);
++
++                                  viewportLastX = xevent.xmotion.x_root;
++                                  viewportLastY = xevent.xmotion.y_root;
++
++                                  break;
++                                }
+ 
+ 				if (g_fullscreen && !g_focused)
+ 					XSetInputFocus(g_display, g_wnd, RevertToPointerRoot,
+@@ -3286,6 +3408,83 @@
+ 
+ 	XFree(image);
+ }
++void MoveViewport(int hShift, int vShift)
++{
++    int newX;
++    int newY;
++    Bool do_move = False;
++    int viewportXSpan = g_viewport_width - g_width;
++    int viewportYSpan = g_viewport_height - g_height;
++
++    if (!g_viewport_wnd)
++    {
++	return;
++    }
++
++  /*
++   * We must keep x coordinate between viewportXSpan and zero, if viewportXSpan
++   * is less then zero. If viewportXSpan is greater or equal to zero, it means
++   * the agent root window has a size smaller than the agent default window.
++   * In this case we keep the old coordinate.
++   */
++
++    if (viewportXSpan < 0)
++    {
++	newX = g_wnd_x - hShift;
++
++	if (newX > 0)
++	{
++	    newX = 0;
++	}
++	else if (newX < viewportXSpan)
++	{
++	    newX = viewportXSpan;
++	}
++    }
++    else if (viewportXSpan == 0)
++    {
++	newX = 0;
++    }
++    else
++    {
++	newX = g_wnd_x;
++    }
++
++    if (viewportYSpan < 0)
++    {
++	newY = g_wnd_y - vShift;
++	if (newY > 0)
++	{
++	    newY = 0;
++	}
++	else if (newY < viewportYSpan)
++	{
++	    newY = viewportYSpan;
++	}
++    }
++    else if (viewportYSpan == 0)
++    {
++	newY = 0;
++    }
++    else
++    {
++	newY = g_wnd_y;
++    }
++    if (newX != g_wnd_x)
++    {
++	g_wnd_x = newX;
++	do_move = True;
++    }
++    if (newY != g_wnd_y)
++    {
++	g_wnd_y = newY;
++	do_move = True;
++    }
++
++    if (do_move)
++	XMoveWindow(g_display, g_wnd, g_wnd_x, g_wnd_y);
++}
++
+ 
+ /* these do nothing here but are used in uiports */
+ void
