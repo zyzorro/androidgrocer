@@ -86,7 +86,7 @@ add_to_keymap(char *keyname, uint8 scancode, uint16 modifiers, char *mapname)
 	}
 
 	DEBUG_KBD(("Adding translation, keysym=0x%x, scancode=0x%x, "
-		   "modifiers=0x%x\n", (unsigned int) keysym, scancode, modifiers));
+           "modifiers=0x%x mapname=%s\n", (unsigned int) keysym, scancode, modifiers,mapname));
 
 	tr = (key_translation *) xmalloc(sizeof(key_translation));
 	memset(tr, 0, sizeof(key_translation));
