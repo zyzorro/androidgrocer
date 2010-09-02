@@ -5466,14 +5466,14 @@ void ONMainWindow::slot_execXmodmap()
 #endif
 }
 
-void ONMainWindow::slot_sudoErr ( QString stderr, sshProcess* proc )
-{
-	/*	QMessageBox::critical ( 0l,tr ( "Error" ),tr("Check your sudo configuration"),
-		                        QMessageBox::Ok,QMessageBox::NoButton );*/
-	proc->setErrorString ( tr ( "<br>Sudo configuration error" ) );
-	proc->kill();
-
-}
+//void ONMainWindow::slot_sudoErr ( QString stderr, sshProcess* proc )
+//{
+//	/*	QMessageBox::critical ( 0l,tr ( "Error" ),tr("Check your sudo configuration"),
+//		                        QMessageBox::Ok,QMessageBox::NoButton );*/
+//	proc->setErrorString ( tr ( "<br>Sudo configuration error" ) );
+//	proc->kill();
+//
+//}
 
 void ONMainWindow::check_cmd_status()
 {
