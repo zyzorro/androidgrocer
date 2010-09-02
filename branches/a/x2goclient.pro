@@ -1,1 +1,0 @@
-x2goclient.pro.default
