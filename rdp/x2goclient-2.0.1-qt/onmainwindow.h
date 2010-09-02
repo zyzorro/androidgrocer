@@ -465,7 +465,7 @@ class ONMainWindow : public QMainWindow
 		void slot_gpgAgentFinished ( int exitCode, QProcess::ExitStatus exitStatus );
 		void slot_checkAgentProcess();
 		void slot_execXmodmap();
-		void slot_sudoErr ( QString stderr, sshProcess* proc );
+        //	void slot_sudoErr ( QString stderr, sshProcess* proc );
 	private:
 		void cartReady();
 	private:
