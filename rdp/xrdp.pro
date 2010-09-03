@@ -122,20 +122,20 @@ SOURCES +=  \
     rdesktop-1.6.0/rdp.c \
     rdesktop-1.6.0/serial.c \
     rdesktop-1.6.0/rdpsnd_alsa.c \
-    ../x2goclient-2.0.1-qt/moc_flatmousetrackingbutton.cpp \
-    ../x2goclient-2.0.1-qt/editconnectiondialog.cpp \
-    ../x2goclient-2.0.1-qt/configdialog.cpp \
-    ../x2goclient-2.0.1-qt/sessionmanagedialog.cpp \
-    ../x2goclient-2.0.1-qt/onmainwindow.cpp \
-    ../x2goclient-2.0.1-qt/x2gologdebug.cpp \
-    ../x2goclient-2.0.1-qt/sshprocess.cpp \
-    ../x2goclient-2.0.1-qt/LDAPSession.cpp \
-    ../x2goclient-2.0.1-qt/exportdialog.cpp \
-    ../x2goclient-2.0.1-qt/imgframe.cpp \
-    ../x2goclient-2.0.1-qt/userbutton.cpp \
-    ../x2goclient-2.0.1-qt/SVGFrame.cpp \
-    ../x2goclient-2.0.1-qt/sessionbutton.cpp \
-    ../x2goclient-2.0.1-qt/ongetpass.cpp
+    ./x2goclient-2.0.1-qt/moc_flatmousetrackingbutton.cpp \
+    ./x2goclient-2.0.1-qt/editconnectiondialog.cpp \
+    ./x2goclient-2.0.1-qt/configdialog.cpp \
+    ./x2goclient-2.0.1-qt/sessionmanagedialog.cpp \
+    ./x2goclient-2.0.1-qt/onmainwindow.cpp \
+    ./x2goclient-2.0.1-qt/x2gologdebug.cpp \
+    ./x2goclient-2.0.1-qt/sshprocess.cpp \
+    ./x2goclient-2.0.1-qt/LDAPSession.cpp \
+    ./x2goclient-2.0.1-qt/exportdialog.cpp \
+    ./x2goclient-2.0.1-qt/imgframe.cpp \
+    ./x2goclient-2.0.1-qt/userbutton.cpp \
+    ./x2goclient-2.0.1-qt/SVGFrame.cpp \
+    ./x2goclient-2.0.1-qt/sessionbutton.cpp \
+    ./x2goclient-2.0.1-qt/ongetpass.cpp
 
 OTHER_FILES += \
     ./xrdp-0.4.1/xrdp/xrdp.ini \
@@ -155,8 +155,8 @@ OTHER_FILES += \
     rdesktop-1.6.0/Makefile.in \
     rdesktop-1.6.0/config.guess \
     rdesktop-1.6.0/configure.ac \
-    ../x2goclient-2.0.1-qt/x2goclient.desktop \
-    ../x2goclient-2.0.1-qt/x2goclient.pro.default
+    ./x2goclient-2.0.1-qt/x2goclient.desktop \
+    ./x2goclient-2.0.1-qt/x2goclient.pro.default
 
 HEADERS += \
     ./xrdp-0.4.1/xrdp/xrdp_types.h \
@@ -286,17 +286,17 @@ HEADERS += \
     rdesktop-1.6.0/parse.h \
     rdesktop-1.6.0/types.h \
     rdesktop-1.6.0/scard.h \
-    ../x2goclient-2.0.1-qt/exportdialog.h \
-    ../x2goclient-2.0.1-qt/LDAPSession.h \
-    ../x2goclient-2.0.1-qt/imgframe.h \
-    ../x2goclient-2.0.1-qt/userbutton.h \
-    ../x2goclient-2.0.1-qt/version.h \
-    ../x2goclient-2.0.1-qt/sessionmanagedialog.h \
-    ../x2goclient-2.0.1-qt/sshprocess.h \
-    ../x2goclient-2.0.1-qt/x2goclientconfig.h \
-    ../x2goclient-2.0.1-qt/x2gologdebug.h \
-    ../x2goclient-2.0.1-qt/SVGFrame.h \
-    ../x2goclient-2.0.1-qt/onmainwindow.h \
-    ../x2goclient-2.0.1-qt/editconnectiondialog.h \
-    ../x2goclient-2.0.1-qt/configdialog.h \
-    ../x2goclient-2.0.1-qt/sessionbutton.h
+    ./x2goclient-2.0.1-qt/exportdialog.h \
+    ./x2goclient-2.0.1-qt/LDAPSession.h \
+    ./x2goclient-2.0.1-qt/imgframe.h \
+    ./x2goclient-2.0.1-qt/userbutton.h \
+    ./x2goclient-2.0.1-qt/version.h \
+    ./x2goclient-2.0.1-qt/sessionmanagedialog.h \
+    ./x2goclient-2.0.1-qt/sshprocess.h \
+    ./x2goclient-2.0.1-qt/x2goclientconfig.h \
+    ./x2goclient-2.0.1-qt/x2gologdebug.h \
+    ./x2goclient-2.0.1-qt/SVGFrame.h \
+    ./x2goclient-2.0.1-qt/onmainwindow.h \
+    ./x2goclient-2.0.1-qt/editconnectiondialog.h \
+    ./x2goclient-2.0.1-qt/configdialog.h \
+    ./x2goclient-2.0.1-qt/sessionbutton.h
